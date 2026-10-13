@@ -1,0 +1,9 @@
+target/
+artifacts/
+coverage/
+# libFuzzer names new corpus entries by hash. Keep only curated inputs:
+# seed-* (hand-written starting points) and regression-* (minimized crashes).
+corpus/**
+!corpus/*/
+!corpus/*/seed-*
+!corpus/*/regression-*

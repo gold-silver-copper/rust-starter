@@ -1,0 +1,30 @@
+# cargo-mutants: does each test suite notice when the code it covers changes?
+# Run `cargo mutants --in-diff <diff>` for a change, `cargo mutants` for all.
+
+# Mutants build with plain rustc, not Clippy, so only rustc lints matter.
+# dead_code = "deny" would make many mutants unbuildable ("unviable") rather
+# than caught or missed, hiding real gaps.
+cap_lints = true
+# Count tests in every workspace member, as CI does.
+test_workspace = true
+additional_cargo_args = ["--all-features", "--locked"]
+# main only forwards to run(); the test helpers are exercised by their own
+# unit tests and are not the product.
+exclude_globs = ["src/main.rs"]
+# A mutant that makes a loop endless must time out, not hang the run.
+minimum_test_timeout = 20
+
+# Mutants no test can tell apart from the original. Each needs a reason; see
+# docs/testing/mutation.md. Keep this list short.
+exclude_re = [
+    # The shrink step bound is a safety limit; one step more changes nothing.
+    "replace < with <= in minimize",
+    # Only changes which draws are rejected for bias; ranges stay correct.
+    "replace & with [|^] in Rng::below",
+    # The later checked row offsets refuse the same out-of-range regions.
+    "replace > with < in Frame::region",
+    # Other read errors would be worded as "missing": a message, not a result.
+    "replace match guard error.kind\\(\\) == io::ErrorKind::NotFound with true in compare",
+    # Turning every opt-in flag off leaves the default path, which all tests take.
+    "replace env_flag -> bool with false",
+]

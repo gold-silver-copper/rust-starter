@@ -1,7 +1,9 @@
 # rust-starter
 
 A dependency-free Rust starting point with strict lints in **all first-party
-targets, including tests**, and a fast optimized `iter` profile.
+targets, including tests**, a fast optimized `iter` profile, and groundwork
+for property, fuzz, golden-file, simulation, mutation, terminal, graphical
+and agent-driven testing that obeys the same lints.
 
 ## Start here
 
@@ -17,9 +19,12 @@ cargo test-iter
 python3 scripts/check-policy.py
 ```
 
-Rename the package in `Cargo.toml` and the `rust_starter` references in
-`src/main.rs` and `tests/output.rs`, then run `cargo generate-lockfile`. Keep
-`Cargo.lock` in version control. The starter has `publish = false`; choose a
+Rename the package in `Cargo.toml` and `fuzz/Cargo.toml`, and the
+`rust_starter` / `rust-starter` references (`grep -rn 'rust.starter' src tests
+fuzz`), then run `cargo generate-lockfile` in the root and in `fuzz/`. Delete
+the example codec (`src/rle.rs`, `tests/codec.rs`, `tests/oracles/rle.rs`,
+`tests/golden/`, the `rle` fuzz target and corpus) once you have your own
+targets. Keep both `Cargo.lock` files in version control. The starter has `publish = false`; choose a
 license and fill in package metadata before enabling publication.
 
 ## The policy
@@ -70,6 +75,9 @@ Unsafe code is rejected by normal Rust compilation. The Clippy restrictions
 require **`cargo lint`**; `cargo build` and `cargo test` do not run Clippy.
 
 These are strong guardrails, not a proof that the whole program cannot panic.
+Clippy lints a third-party macro's expansion as that crate's code, so an
+`unwrap` or `panic!` hidden inside a dependency's macro passes every lint;
+`clippy.toml` therefore bans the known panicking test macros by path.
 The standard library, dependencies, callbacks, macro expansions, allocation
 failures and APIs outside the curated ban list can still panic or abort.
 Only compiled configurations are checked; Clippy does not check Rust code in
@@ -82,6 +90,26 @@ production code, unit tests and integration tests. It checks the specific
 diagnostic, including refusal of a local `#[expect]` override. It also checks
 that every workspace member opts into the shared lints. Fixtures and artifacts
 stay under `target/`.
+
+## Testing
+
+[docs/testing/README.md](docs/testing/README.md) is the playbook: which
+technique fits which problem, and how to run it. The pieces:
+
+| Piece | What it is |
+| --- | --- |
+| `testkit/` | Dependency-free dev-dependency: `ensure`/`ensure_eq` returning `Failure`, seeds and a portable RNG, property exploration with shrinking, golden files, a deterministic network simulator, private scratch dirs and kill-on-drop processes, image frames, and a private fux server for driving terminal programs |
+| `tests/codec.rs`, `tests/oracles/` | Property, corpus-replay and golden-file templates sharing one oracle with the fuzzer |
+| `tests/simulation.rs` | TigerBeetle-style simulation: swarm faults, safety every step, liveness after healing |
+| `tests/tui.rs` | The real binary driven through a private fux server |
+| `fuzz/` | cargo-fuzz crate (nightly), its own workspace and a policy-checked copy of the lints |
+| `.cargo/mutants.toml` | cargo-mutants settings that keep the strict lints from hiding mutants |
+| `scripts/holdout.py` | Seal, unseal and score held-out evaluation sets |
+| `prompts/` | Agent templates: playtest, stress test, test audit |
+
+Randomized tests use a fixed seed locally and the commit in CI; every failure
+prints the `TEST_SEED=…` that replays it. `REQUIRE_FUX=1` turns the fux test's
+skip into a failure wherever fux is installed.
 
 ## Build profiles
 
@@ -122,17 +150,21 @@ Run checks with `--workspace` so the root package does not hide member tests.
 Standalone packages excluded from the workspace need their own lint tables and
 CI checks; adding them requires updating the workflow explicitly.
 
-CI runs formatting, Clippy for all targets/features, the policy regression
-checks, ordinary and `iter` tests, documentation and a release build. It starts
+CI runs formatting, Clippy for all targets/features (and for `fuzz/`), the
+policy regression checks, ordinary and `iter` tests, the holdout script's
+self-test, documentation and a release build, plus `cargo mutants --in-diff`
+on pull requests. The scheduled `deep` workflow fuzzes each target, runs
+property and simulation tests with far more cases, and mutates the whole
+workspace. It starts
 with Linux; add platforms and feature combinations as the application needs
 them. Both declared minimum Rust and the pinned toolchain are 1.98.1, so there
 is no separate, untested older-version claim. Update both together, or introduce
 a separate minimum-version job when they diverge.
 
 No async runtime, CLI framework, error crate, linker override, native CPU flag,
-dependency optimization override or heavy test framework is preselected. Add
-dependency advisory checks when adding dependencies, and fuzz/property tests
-when there is an actual parser, protocol or invariant to exercise.
+dependency optimization override or test framework is preselected; `testkit`
+covers the common cases without dependencies. Add dependency advisory checks
+when adding dependencies.
 
 ## Where the defaults came from
 
@@ -160,3 +192,19 @@ pattern. No retained Claude session for rig was found; its contribution comes
 from the local checkout at `.rig-desktop/source/rig`. Session retention was
 partial, so this is a synthesis of available evidence, not a claim to have
 recovered all project history.
+
+The testing groundwork came from a second review on 2026-10-12 of the same
+projects' tests, notes and sessions, plus TigerBeetle and Trustfall:
+
+| Source | Adopted |
+| --- | --- |
+| fux | Private-server terminal driving, waits instead of sleeps, fuzz targets that check properties, corpus naming, the agent benchmark and held-out spec method, mutation testing of a redesign |
+| koh | Sans-I/O cores with injected time, a seeded fake network, fuzz corpora seeded from valid messages, a single test-support crate, the test-removal audit checklist |
+| ck | A fuzzer of fake sites on a virtual clock with shrinking and seed replay; the playtest loop |
+| bevy_terminal, hyper-surf, ratty, ghtui | Offscreen rendering and rule-based image checks instead of pixel matches; artifacts for agents; the cost of whole-screen snapshots |
+| TigerBeetle | One seed per world, swarm faults, safety every step and liveness after healing, the commit as the CI seed |
+| Trustfall | Golden files for contracts only, fuzz corpora seeded from test fixtures |
+
+A compile spike confirmed which tools fit the lint policy: proptest through
+`TestRunner`, cargo-fuzz in its own workspace, cargo-mutants with
+`cap_lints`; insta's and `proptest!`'s panicking macros do not.

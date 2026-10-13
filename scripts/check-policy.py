@@ -31,6 +31,8 @@ CASES = {
     "copy": ("clippy::disallowed_methods", "pub fn probe(a: &mut [u8], b: &[u8]) { a.copy_from_slice(b); }"),
     "chunks": ("clippy::disallowed_methods", "pub fn probe(v: &[u8], n: usize) { let _chunks = v.chunks(n); }"),
     "borrow": ("clippy::disallowed_methods", "pub fn probe(v: &std::cell::RefCell<u8>) { let _value = v.borrow(); }"),
+    "abort": ("clippy::disallowed_methods", "pub fn probe() { std::process::abort() }"),
+    "temp_dir": ("clippy::disallowed_methods", "pub fn probe() -> std::path::PathBuf { std::env::temp_dir() }"),
     "override": ("E0453", '#[expect(clippy::unwrap_used, reason = "test exemption")]\npub fn probe(v: Option<u8>) -> u8 { v.unwrap() }'),
 }
 for macro in ("assert", "assert_eq", "assert_ne", "debug_assert", "debug_assert_eq", "debug_assert_ne"):
@@ -59,6 +61,24 @@ def run_cargo(directory, *args):
     )
 
 
+# The fuzz crate is outside the workspace (nightly, sanitizers) and copies
+# the policy. This is the only difference it may have.
+FUZZ_EXCEPTIONS = {("clippy", "panic"): ("forbid", "deny")}
+
+
+def check_fuzz_lints(workspace_lints):
+    path = ROOT / "fuzz" / "Cargo.toml"
+    if not path.exists():
+        return
+    fuzz = tomllib.loads(path.read_text()).get("lints", {})
+    for tool in sorted(set(workspace_lints) | set(fuzz)):
+        ours, theirs = workspace_lints.get(tool, {}), fuzz.get(tool, {})
+        for lint in sorted(set(ours) | set(theirs)):
+            want, have = ours.get(lint), theirs.get(lint)
+            if want != have and FUZZ_EXCEPTIONS.get((tool, lint)) != (want, have):
+                raise SystemExit(f"fuzz/Cargo.toml lints.{tool}.{lint} is {have!r}; the workspace has {want!r}")
+
+
 def main():
     metadata = run_cargo(ROOT, "metadata", "--no-deps", "--format-version=1", "--locked")
     if metadata.returncode:
@@ -69,6 +89,8 @@ def main():
             manifest = tomllib.loads(Path(package["manifest_path"]).read_text())
             if manifest.get("lints", {}).get("workspace") is not True:
                 raise SystemExit(f"{package['name']} must inherit [lints] workspace = true")
+
+    check_fuzz_lints(tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["lints"])
 
     scratch = ROOT / "target" / "policy-fixtures"
     scratch.mkdir(parents=True, exist_ok=True)
