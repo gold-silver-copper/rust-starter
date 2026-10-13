@@ -9,7 +9,10 @@ mod oracle;
 use libfuzzer_sys::fuzz_target;
 
 /// Report a property failure the only way libFuzzer understands.
-#[expect(clippy::panic, reason = "libFuzzer records a failure only on panic or abort")]
+#[expect(
+    clippy::panic,
+    reason = "libFuzzer records a failure only on panic or abort"
+)]
 fn fail(message: &testkit::Failure) -> ! {
     panic!("{message}")
 }

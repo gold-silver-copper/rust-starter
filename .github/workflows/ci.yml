@@ -30,6 +30,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Lints, including tests and examples
         run: cargo lint
+      - name: Formatting of the fuzz crate (its own workspace)
+        run: cargo fmt --manifest-path fuzz/Cargo.toml --check
       - name: Lints for the fuzz crate (its own workspace)
         run: cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
       - name: Lint policy regression checks

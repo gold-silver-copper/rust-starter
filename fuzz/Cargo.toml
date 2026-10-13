@@ -29,7 +29,9 @@ bench = false
 unsafe_code = "forbid"
 unused_must_use = "forbid"
 unconditional_recursion = "forbid"
-dead_code = "deny"
+# Targets include shared test code (tests/oracles, tests/support) by #[path];
+# each uses only part of it. scripts/check-policy.py allows this difference.
+dead_code = "allow"
 unfulfilled_lint_expectations = "deny"
 
 [lints.rustdoc]

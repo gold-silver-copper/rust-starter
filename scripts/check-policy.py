@@ -62,8 +62,11 @@ def run_cargo(directory, *args):
 
 
 # The fuzz crate is outside the workspace (nightly, sanitizers) and copies
-# the policy. This is the only difference it may have.
-FUZZ_EXCEPTIONS = {("clippy", "panic"): ("forbid", "deny")}
+# the policy. These are the only differences it may have.
+FUZZ_EXCEPTIONS = {
+    ("clippy", "panic"): ("forbid", "deny"),
+    ("rust", "dead_code"): ("deny", "allow"),
+}
 
 
 def check_fuzz_lints(workspace_lints):

@@ -36,6 +36,10 @@ choose the conservative option, record why, and continue.
 
 ## 2. Lay the test groundwork before the features
 
+`src/lib.rs`'s `run()` and `tests/output.rs` are placeholders from the
+starter: replace them with the real entry point and its tests (keep the
+broken-pipe test's pattern: output errors must surface).
+
 1. `tests/oracles/NAME.rs`: one function per area, `check(input) -> Result<(), Failure>`,
    checking every property in the spec. New behaviour means a new property
    here, not a new hand-picked example elsewhere.
@@ -43,7 +47,11 @@ choose the conservative option, record why, and continue.
    and shrinkers (`fn shrink(thing: &Thing) -> Vec<Thing>`, smaller variants)
    for the domain's values. Extend these; never write a second generator.
    Bias generators toward the interesting region (small sizes, repeats,
-   boundaries); uniform randomness rarely hits it.
+   boundaries); uniform randomness rarely hits it. Use `rng.choose(first,
+   &rest)` and `rng.up_to(max)`, which cannot fail, instead of `pick` or
+   `below` plus a default. Generate and shrink the structured value (axioms,
+   commands); render it to text inside the property, so shrinking stays
+   simple.
 3. Tests that drive the oracle with `testkit::Explore`, include support code
    with `#[path = "support/gen.rs"] mod gen;` (or a `tests/support/mod.rs`).
 
@@ -60,8 +68,8 @@ For each slice in the plan:
 4. Run the gate (below). Fix everything it reports.
 5. Tick the slice in `docs/spec.md` and commit locally with a message that
    says what the slice does. Do not push, publish or open pull requests
-   unless the person asked; if git has no identity, ask the person rather
-   than inventing one.
+   unless the person asked. If git has no identity, never invent one: keep
+   working without commits and say so in the final report.
 
 Keep the program runnable after every slice. Prefer deleting code to adding
 it, and the simplest design that passes the properties.
@@ -80,13 +88,17 @@ python3 scripts/check-policy.py        # after changing Cargo.toml, clippy.toml 
 Before declaring the work done, also:
 
 ```sh
-# BASE: the commit before this task began (git log shows it)
-git diff --src-prefix=a/ --dst-prefix=b/ BASE > changes.diff
-TMPDIR="$HOME/.cache" cargo mutants --in-diff changes.diff -j 2
+# BASE: the commit before this task began; for the first task, the
+# "Scaffold from rust-starter" commit (git log --reverse | head).
+git diff --src-prefix=a/ --dst-prefix=b/ BASE > target/changes.diff
+cargo mutants --in-diff target/changes.diff -j 2
 ```
 
 Every **missed** mutant gets a test that catches it or a written reason it
-cannot be told apart (then add it to `exclude_re` in `.cargo/mutants.toml`).
+cannot be told apart (then add a regex for it to `exclude_re` in
+`.cargo/mutants.toml`, with the reason as a comment). cargo-mutants copies
+the project to the temporary directory; if that is RAM-backed or small, set
+`TMPDIR` to a directory on disk.
 Then run the program the way the person will, and confirm a real use works.
 
 **Done means**: the spec's plan is ticked, the gate passes, no unexplained
@@ -222,8 +234,22 @@ shrink_bytes, replay_dir), `golden`, `sim` (Network, Faults), `sandbox`
 
 # Adding fuzzing
 
-When the project has a parser or reads untrusted bytes, copy `fuzz/` from
-rust-starter at the pinned commit, rename the package and target, point the
-target at your oracle, add `seed-*` corpus files, and add a test that replays
-the corpus with `testkit::explore::replay_dir`. `scripts/check-policy.py`
-then keeps the fuzz crate's lints equal to the workspace's.
+When the project has a parser or reads untrusted bytes:
+
+1. Copy `fuzz/` (with its `.gitignore`) from rust-starter at the pinned
+   commit (`{{starter_url}}/tree/{{rev}}/fuzz`).
+2. In `fuzz/Cargo.toml`: rename the package, replace the
+   `rust-starter = { path = ".." }` dependency with this crate
+   (`NAME = { path = ".." }`), and replace `testkit = { path = "../testkit" }`
+   with the same `testkit = { git = ..., rev = ... }` line as the root
+   `Cargo.toml`. Rename the `[[bin]]` target.
+3. Point the target at your oracle (`#[path = "../../tests/oracles/NAME.rs"]`).
+   The fuzz crate allows `dead_code`, because targets use only part of the
+   shared test code; nothing else may differ from the root lints, and
+   `scripts/check-policy.py` enforces that.
+4. `cargo generate-lockfile` in `fuzz/` and commit `fuzz/Cargo.lock`.
+5. Add `fuzz/corpus/TARGET/seed-*` files, and a test that replays them with
+   `testkit::explore::replay_dir` so stable CI runs them.
+6. Check: `cargo fmt --manifest-path fuzz/Cargo.toml --check`,
+   `cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings`,
+   and a short `cargo +nightly fuzz run TARGET -- -max_total_time=30`.

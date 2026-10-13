@@ -17,6 +17,7 @@ checks, so the agent starts from a green baseline.
 """
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -113,12 +114,21 @@ def main():
 
     mutants = dest / ".cargo/mutants.toml"
     text = mutants.read_text()
-    mutants.write_text(text[: text.index("\n# Mutants no test can tell apart")] + "\n")
+    mutants.write_text(
+        text[: text.index("\n# Mutants no test can tell apart")]
+        + "\n\n# Mutants no test can tell apart from the original, each with its reason.\n"
+        + "exclude_re = []\n"
+    )
 
     ci = dest / ".github/workflows/ci.yml"
-    sub(ci, """      - name: Lints for the fuzz crate (its own workspace)
+    sub(ci, """      - name: Formatting of the fuzz crate (its own workspace)
+        run: cargo fmt --manifest-path fuzz/Cargo.toml --check
+      - name: Lints for the fuzz crate (its own workspace)
         run: cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
-""", """      - name: Lints for the fuzz crate (its own workspace)
+""", """      - name: Formatting of the fuzz crate (its own workspace)
+        if: hashFiles('fuzz/Cargo.toml') != ''
+        run: cargo fmt --manifest-path fuzz/Cargo.toml --check
+      - name: Lints for the fuzz crate (its own workspace)
         if: hashFiles('fuzz/Cargo.toml') != ''
         run: cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
 """)
@@ -145,6 +155,7 @@ def main():
     print(f"created {dest} ({name}) with testkit from {'git ' + rev[:12] if arguments.testkit == 'git' else 'this checkout'}")
 
     if not arguments.no_check:
+        os.environ.setdefault("CARGO_BUILD_JOBS", "2")
         checks = (
             ("cargo", "fmt", "--all", "--check"),
             ("cargo", "lint"),
@@ -152,10 +163,18 @@ def main():
             ("python3", "scripts/check-policy.py"),
         )
         for command in checks:
+            print(f"  {' '.join(command)}", flush=True)
             result = run(*command, cwd=dest, check=False)
             if result.returncode:
                 raise SystemExit(f"{' '.join(command)} failed in {dest}:\n{result.stdout}\n{result.stderr}")
         print("baseline green: fmt, lint, tests, policy")
+
+    # The scaffold commit is the base the first task's mutation diff starts
+    # from. Without a git identity, leave it to the agent (see AGENTS.md).
+    run("git", "add", "-A", cwd=dest)
+    committed = run("git", "commit", "-q", "-m", "Scaffold from rust-starter", cwd=dest, check=False)
+    if committed.returncode:
+        print("not committed: git has no identity here; AGENTS.md says what to do")
     print(f"next: cd {dest} and follow AGENTS.md, starting with docs/spec.md")
     return 0
 
