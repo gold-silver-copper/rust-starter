@@ -1,0 +1,4 @@
+[alias]
+lint = "clippy --workspace --all-targets --all-features --locked -- -D warnings"
+iter = "run --profile iter --locked"
+test-iter = "test --workspace --all-features --profile iter --locked"

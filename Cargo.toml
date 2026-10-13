@@ -1,0 +1,118 @@
+[workspace]
+members = ["."]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.98.1"
+
+[package]
+name = "rust-starter"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "A strict Rust starter with checked operations and fast iteration builds"
+publish = false
+
+[lints]
+workspace = true
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "forbid"
+unconditional_recursion = "forbid"
+dead_code = "deny"
+unfulfilled_lint_expectations = "deny"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+suspicious = { level = "forbid", priority = -1 }
+
+# These apply to libraries, binaries, examples, benches AND tests.
+# No cfg_attr(not(test), ...), local allow/expect, or test exemptions.
+unwrap_used = "forbid"
+expect_used = "forbid"
+panic = "forbid"
+unreachable = "forbid"
+todo = "forbid"
+unimplemented = "forbid"
+indexing_slicing = "forbid"
+string_slice = "forbid"
+get_unwrap = "forbid"
+unwrap_in_result = "forbid"
+panic_in_result_fn = "forbid"
+fallible_impl_from = "forbid"
+expect_fun_call = "forbid"
+unchecked_time_subtraction = "forbid"
+arithmetic_side_effects = "forbid"
+integer_division = "forbid"
+cast_possible_truncation = "forbid"
+cast_possible_wrap = "forbid"
+cast_sign_loss = "forbid"
+cast_precision_loss = "forbid"
+cast_lossless = "forbid"
+lossy_float_literal = "forbid"
+
+# Printing macros can panic on failed writes. Use Write and propagate errors.
+print_stdout = "forbid"
+print_stderr = "forbid"
+dbg_macro = "forbid"
+exit = "forbid"
+infinite_loop = "forbid"
+large_stack_frames = "forbid"
+large_stack_arrays = "forbid"
+mem_forget = "forbid"
+read_zero_byte_vec = "forbid"
+unused_result_ok = "forbid"
+let_underscore_future = "forbid"
+debug_assert_with_mut_call = "forbid"
+disallowed_methods = "forbid"
+disallowed_macros = "forbid"
+allow_attributes = "forbid"
+allow_attributes_without_reason = "forbid"
+
+# These permit a narrow #[expect(..., reason = "...")] when justified.
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
+significant_drop_in_scrutinee = "deny"
+map_err_ignore = "deny"
+wildcard_enum_match_arm = "deny"
+
+# Selected readability lints, without enabling every pedantic/nursery rule.
+manual_let_else = "warn"
+match_same_arms = "warn"
+redundant_clone = "warn"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
+
+# rig's compromise: useful backtraces without full variable/type debuginfo.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+# Shipping builds. Overflow stays checked; unwinding preserves cleanup.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+overflow-checks = true
+panic = "unwind"
+
+# Optimized edit/run/test loop, adapted from release-fast and gen-test.
+# "off" disables even local thin LTO; false still permits local thin LTO.
+[profile.iter]
+inherits = "release"
+lto = "off"
+codegen-units = 16
+incremental = true
+debug = "line-tables-only"
+debug-assertions = true
+
+[profile.iter.package."*"]
+debug = false

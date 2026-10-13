@@ -1,0 +1,79 @@
+# No test-specific escape hatches. These are explicit to preserve the policy.
+allow-unwrap-in-tests = false
+allow-expect-in-tests = false
+allow-panic-in-tests = false
+allow-indexing-slicing-in-tests = false
+allow-print-in-tests = false
+allow-dbg-in-tests = false
+
+# Curated panic-prone APIs, based on fux. This list is not a proof that all
+# called code is panic-free. Allocation failures, dependencies, callbacks,
+# macros and APIs outside this list still need review.
+# No fux-specific hot-path exceptions are carried into this starter.
+disallowed-methods = [
+    { path = "alloc::vec::Vec::insert", reason = "panics past the end: build the new Vec from iterators" },
+    { path = "alloc::vec::Vec::remove", reason = "panics past the end: build the new Vec from iterators" },
+    { path = "alloc::vec::Vec::swap_remove", reason = "panics past the end" },
+    { path = "alloc::vec::Vec::drain", reason = "panics on invalid ranges: use retain or checked iteration" },
+    { path = "alloc::vec::Vec::split_off", reason = "panics past the end" },
+    { path = "alloc::vec::Vec::splice", reason = "panics on a range out of bounds" },
+    { path = "alloc::vec::Vec::extract_if", reason = "panics on a range out of bounds" },
+    { path = "alloc::collections::VecDeque::insert", reason = "panics past the end: move elements with get and get_mut" },
+    { path = "alloc::collections::VecDeque::swap", reason = "panics on an index out of bounds" },
+    { path = "alloc::collections::VecDeque::drain", reason = "panics on a range out of bounds" },
+    { path = "alloc::collections::VecDeque::split_off", reason = "panics past the end" },
+    { path = "alloc::collections::VecDeque::range", reason = "panics on a range out of bounds" },
+    { path = "alloc::collections::VecDeque::range_mut", reason = "panics on a range out of bounds" },
+    { path = "alloc::collections::VecDeque::rotate_left", reason = "panics past the end" },
+    { path = "alloc::collections::VecDeque::rotate_right", reason = "panics past the end" },
+    { path = "alloc::string::String::insert", reason = "panics off a char boundary: edit by chars" },
+    { path = "alloc::string::String::insert_str", reason = "panics off a char boundary: edit by chars" },
+    { path = "alloc::string::String::remove", reason = "panics off a char boundary: edit by chars" },
+    { path = "alloc::string::String::replace_range", reason = "panics off a char boundary: edit by chars" },
+    { path = "alloc::string::String::drain", reason = "panics off a char boundary" },
+    { path = "alloc::string::String::split_off", reason = "panics off a char boundary" },
+    { path = "alloc::string::String::truncate", reason = "panics off a char boundary: build the shorter string" },
+    { path = "str::split_at", reason = "panics off a char boundary: split_at_checked" },
+    { path = "str::split_at_mut", reason = "panics off a char boundary: split_at_mut_checked" },
+    { path = "str::repeat", reason = "panics when the length overflows: iter::repeat_n" },
+    { path = "slice::split_at", reason = "panics past the end: split_at_checked" },
+    { path = "slice::split_at_mut", reason = "panics past the end: split_at_mut_checked" },
+    { path = "slice::swap", reason = "panics on an index out of bounds: get_disjoint_mut" },
+    { path = "slice::swap_with_slice", reason = "panics on slices of different lengths" },
+    { path = "slice::clone_from_slice", reason = "panics on slices of different lengths" },
+    { path = "slice::select_nth_unstable", reason = "panics past the end" },
+    { path = "slice::chunks", reason = "panics on a zero size: as_chunks, or split_at_checked" },
+    { path = "slice::chunks_mut", reason = "panics on a zero size" },
+    { path = "slice::chunks_exact", reason = "panics on a zero size: as_chunks" },
+    { path = "slice::rchunks", reason = "panics on a zero size" },
+    { path = "slice::windows", reason = "panics on a zero size: get and starts_with" },
+    { path = "slice::repeat", reason = "panics when the length overflows: iter::repeat_n" },
+    { path = "core::iter::Iterator::step_by", reason = "panics on a zero step" },
+    { path = "slice::rotate_left", reason = "panics when the count exceeds the length: use a checked abstraction" },
+    { path = "slice::rotate_right", reason = "panics when the count exceeds the length: use a checked abstraction" },
+    { path = "slice::copy_within", reason = "panics on invalid ranges: use checked access and iteration" },
+    { path = "slice::copy_from_slice", reason = "panics on length mismatch: check lengths and zip iterators" },
+    { path = "slice::chunks_exact_mut", reason = "panics on a zero chunk size: use checked iteration" },
+    { path = "slice::rchunks_mut", reason = "panics on a zero chunk size: use checked iteration" },
+    { path = "slice::rchunks_exact", reason = "panics on a zero chunk size: use checked iteration" },
+    { path = "slice::rchunks_exact_mut", reason = "panics on a zero chunk size: use checked iteration" },
+    { path = "slice::select_nth_unstable_by", reason = "panics past the end: use checked access" },
+    { path = "slice::select_nth_unstable_by_key", reason = "panics past the end: use checked access" },
+    { path = "char::encode_utf8", reason = "panics on a short buffer: use char::to_string or String::push" },
+    { path = "char::encode_utf16", reason = "panics on a short buffer: use str::encode_utf16" },
+    { path = "core::cell::RefCell::borrow", reason = "panics on conflicting borrows: use try_borrow" },
+    { path = "core::cell::RefCell::borrow_mut", reason = "panics on conflicting borrows: use try_borrow_mut" },
+    { path = "std::thread::spawn", reason = "panics if the thread cannot be created: use thread::Builder::spawn" },
+    { path = "std::panic::resume_unwind", reason = "resumes a panic: propagate an error instead" },
+    { path = "std::time::Instant::duration_since", reason = "use checked_duration_since to handle reversed instants explicitly" },
+]
+
+# clippy::panic does not cover assertions. Tests return Result instead.
+disallowed-macros = [
+    { path = "core::assert", reason = "can panic: return an error, including in tests" },
+    { path = "core::assert_eq", reason = "can panic: return an error, including in tests" },
+    { path = "core::assert_ne", reason = "can panic: return an error, including in tests" },
+    { path = "core::debug_assert", reason = "can panic: return an error, including in tests" },
+    { path = "core::debug_assert_eq", reason = "can panic: return an error, including in tests" },
+    { path = "core::debug_assert_ne", reason = "can panic: return an error, including in tests" },
+]

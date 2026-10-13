@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: rustup show active-toolchain
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Lints, including tests and examples
+        run: cargo lint
+      - name: Lint policy regression checks
+        run: python3 scripts/check-policy.py
+      - name: Tests, including documentation tests
+        run: cargo test --workspace --all-features --locked
+      - name: Optimized iteration tests
+        run: cargo test-iter
+      - name: Documentation
+        run: cargo doc --workspace --all-features --no-deps --locked
+      - name: Release build
+        run: cargo build --workspace --all-targets --all-features --release --locked
