@@ -126,6 +126,27 @@ impl Rng {
         items.get(self.index(items.len())?)
     }
 
+    /// A random value from `first` and `rest`. It cannot fail, because the
+    /// choice is never empty: `rng.choose(b'a', &[b'b', b'\0'])`.
+    pub fn choose<T: Copy>(&mut self, first: T, rest: &[T]) -> T {
+        match self.index(rest.len().checked_add(1).unwrap_or(rest.len())) {
+            Some(0) | None => first,
+            Some(position) => position
+                .checked_sub(1)
+                .and_then(|at| rest.get(at))
+                .copied()
+                .unwrap_or(first),
+        }
+    }
+
+    /// A value in `0..=max`. It cannot fail, unlike [`Rng::below`].
+    pub fn up_to(&mut self, max: u64) -> u64 {
+        match max.checked_add(1) {
+            Some(bound) => self.below(bound).unwrap_or(max),
+            None => self.next_u64(),
+        }
+    }
+
     /// `len` random bytes.
     pub fn bytes(&mut self, len: usize) -> Vec<u8> {
         std::iter::repeat_with(|| self.next_u64())
@@ -223,6 +244,22 @@ mod tests {
             items.iter().all(|item| picked.contains(&item)),
             "pick never chose some items",
         )?;
-        ensure(rng.pick::<u8>(&[]).is_none(), "pick from nothing")
+        ensure(rng.pick::<u8>(&[]).is_none(), "pick from nothing")?;
+        let chosen: Vec<u8> = (0..60).map(|_| rng.choose(b'a', b"bc")).collect();
+        ensure(
+            b"abc".iter().all(|item| chosen.contains(item)),
+            "choose never chose some items",
+        )?;
+        ensure_eq(&rng.choose(7, &[]), &7, "choose from one")?;
+        let drawn: Vec<u64> = (0..60).map(|_| rng.up_to(2)).collect();
+        ensure(
+            (0..=2).all(|value| drawn.contains(&value)),
+            format!("up_to(2) gave {drawn:?}"),
+        )?;
+        ensure_eq(&rng.up_to(0), &0, "up_to(0)")?;
+        ensure(
+            rng.up_to(u64::MAX) != rng.up_to(u64::MAX),
+            "up_to(MAX) repeated a value",
+        )
     }
 }

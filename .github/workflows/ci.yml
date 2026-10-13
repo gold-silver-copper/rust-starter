@@ -30,6 +30,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Lints, including tests and examples
         run: cargo lint
+      - name: Formatting of the fuzz crate (its own workspace)
+        run: cargo fmt --manifest-path fuzz/Cargo.toml --check
       - name: Lints for the fuzz crate (its own workspace)
         run: cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
       - name: Lint policy regression checks
@@ -90,3 +92,17 @@ jobs:
           name: mutants
           path: mutants.out
           if-no-files-found: ignore
+
+  # The template itself: generate a project and require it to be green, so
+  # scripts/new-project.py and template/ cannot rot. (Must stay the last job.)
+  new-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: rustup show active-toolchain
+      - name: Generate a project and run its checks
+        run: python3 scripts/new-project.py demo-project "$RUNNER_TEMP/demo-project" --testkit path

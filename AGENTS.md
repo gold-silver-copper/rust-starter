@@ -1,7 +1,27 @@
+# Creating a new project from this starter
+
+When asked to create a project based on rust-starter, do not copy the
+directory by hand. Run:
+
+```sh
+python3 scripts/new-project.py NAME ~/code/NAME --description "ONE LINE"
+```
+
+It renames everything, leaves out the example code, depends on this
+repository's `testkit` by git (pinned to the current commit, which must be
+pushed), writes the project's `AGENTS.md` and `docs/spec.md` from
+`template/`, and checks the result is green. Then `cd` into the project and
+follow **its** `AGENTS.md`: write the spec from the person's request, lay the
+test groundwork, build in slices. The rest of this file is about changing
+the starter itself.
+
 # Working in this starter
 
 - Keep the unsafe and panic-prevention lints at `forbid`, including tests.
   No test-only relaxations, `cfg_attr(not(test), ...)`, or blanket exemptions.
+- Short idioms that pass these lints (indexing, arithmetic, casts, slicing)
+  are in `template/AGENTS.md` under "Idioms that pass the lints"; use them
+  here too.
 - Tests return `Result`; propagate setup failures with `?` and return `Err`
   on a mismatch. Assertion macros are forbidden too.
 - Prefer checked access, fallible conversions and arithmetic with explicit

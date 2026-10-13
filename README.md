@@ -5,6 +5,18 @@ targets, including tests**, a fast optimized `iter` profile, and groundwork
 for property, fuzz, golden-file, simulation, mutation, terminal, graphical
 and agent-driven testing that obeys the same lints.
 
+## New project
+
+```sh
+python3 scripts/new-project.py NAME ~/code/NAME --description "ONE LINE"
+```
+
+creates a project with this policy, CI and testing setup, depending on this
+repository's `testkit` by git. Then tell an agent what the project should be:
+the generated `AGENTS.md` makes it write a spec with checkable properties,
+build the tests first, and develop in verified slices. `template/` holds the
+files a new project gets.
+
 ## Start here
 
 Rustup installs the pinned toolchain, Clippy and rustfmt from
