@@ -1,0 +1,10 @@
+[package]
+name = "testkit"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Panic-free test helpers: checks, seeds, golden files, simulation, sandboxes, fux driving"
+publish = false
+
+[lints]
+workspace = true

@@ -1,0 +1,94 @@
+name: Deep testing
+
+# Long runs that do not belong on every push: many more property and
+# simulation cases, coverage-guided fuzzing, and mutation testing of the
+# whole workspace. Each night uses a new seed; a failure prints the
+# TEST_SEED=… that replays it locally.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cases:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TEST_SEED: ${{ github.run_id }}
+      TEST_CASES: "200000"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: rustup show active-toolchain
+      - name: Property and simulation tests with many cases
+        run: cargo test --workspace --all-features --release --locked
+      - name: Keep test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-test-artifacts
+          path: target/tmp/artifacts
+          if-no-files-found: ignore
+
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install nightly
+        run: rustup toolchain install nightly --profile minimal
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Restore the corpus libFuzzer grew on earlier nights
+        uses: actions/cache@v4
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+      - name: Fuzz every target for two minutes
+        working-directory: fuzz
+        run: |
+          cargo +nightly fetch --locked  # cargo-fuzz has no --locked; fail on a stale lockfile here
+          for target in $(cargo +nightly fuzz list); do
+            cargo +nightly fuzz run "$target" -- -max_total_time=120 -rss_limit_mb=2048
+          done
+      - name: Keep crashes for minimizing
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts
+
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: rustup show active-toolchain
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: Mutate the whole workspace
+        run: cargo mutants --workspace -j 2
+      - name: Keep the mutants report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants
+          path: mutants.out
+          if-no-files-found: ignore

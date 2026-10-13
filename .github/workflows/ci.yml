@@ -30,8 +30,12 @@ jobs:
         run: cargo fmt --all --check
       - name: Lints, including tests and examples
         run: cargo lint
+      - name: Lints for the fuzz crate (its own workspace)
+        run: cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
       - name: Lint policy regression checks
         run: python3 scripts/check-policy.py
+      - name: Held-out evaluation script self-test
+        run: python3 scripts/holdout.py selftest
       - name: Tests, including documentation tests
         run: cargo test --workspace --all-features --locked
       - name: Optimized iteration tests
@@ -40,3 +44,38 @@ jobs:
         run: cargo doc --workspace --all-features --no-deps --locked
       - name: Release build
         run: cargo build --workspace --all-targets --all-features --release --locked
+      - name: Keep test artifacts (captures, frames) for review
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: target/tmp/artifacts
+          if-no-files-found: ignore
+
+  # Do the tests notice when the changed code changes? Missed mutants are
+  # behaviour no test pins down; see docs/testing/mutation.md.
+  mutants:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: rustup show active-toolchain
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: Mutate the lines this pull request changes
+        run: |
+          git diff --src-prefix=a/ --dst-prefix=b/ "origin/${GITHUB_BASE_REF}...HEAD" > changes.diff
+          cargo mutants --workspace --in-diff changes.diff -j 2 --no-shuffle
+      - name: Keep the mutants report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants
+          path: mutants.out
+          if-no-files-found: ignore

@@ -66,6 +66,8 @@ disallowed-methods = [
     { path = "std::thread::spawn", reason = "panics if the thread cannot be created: use thread::Builder::spawn" },
     { path = "std::panic::resume_unwind", reason = "resumes a panic: propagate an error instead" },
     { path = "std::time::Instant::duration_since", reason = "use checked_duration_since to handle reversed instants explicitly" },
+    { path = "std::process::abort", reason = "aborts without cleanup and no Clippy lint catches it: return an error" },
+    { path = "std::env::temp_dir", reason = "the shared system temp dir (often RAM-backed): use testkit::sandbox::Scratch under target/" },
 ]
 
 # clippy::panic does not cover assertions. Tests return Result instead.
@@ -76,4 +78,13 @@ disallowed-macros = [
     { path = "core::debug_assert", reason = "can panic: return an error, including in tests" },
     { path = "core::debug_assert_eq", reason = "can panic: return an error, including in tests" },
     { path = "core::debug_assert_ne", reason = "can panic: return an error, including in tests" },
+    # Third-party macros are linted as the dependency's code, so their hidden
+    # unwraps and panics pass every other lint. Ban the panicking ones by
+    # path, ahead of adoption; docs/testing/README.md has the alternatives.
+    { path = "insta::assert_snapshot", reason = "panics on mismatch: testkit::golden::check", allow-invalid = true },
+    { path = "insta::assert_debug_snapshot", reason = "panics on mismatch: testkit::golden::check", allow-invalid = true },
+    { path = "insta::assert_yaml_snapshot", reason = "panics on mismatch: testkit::golden::check", allow-invalid = true },
+    { path = "insta::assert_json_snapshot", reason = "panics on mismatch: testkit::golden::check", allow-invalid = true },
+    { path = "proptest::proptest", reason = "fails by panicking: use TestRunner::run in a Result test", allow-invalid = true },
+    { path = "proptest::prop_oneof", reason = "emits allow(clippy::suspicious) lints: use proptest::strategy::Union", allow-invalid = true },
 ]

@@ -1,5 +1,8 @@
 [workspace]
-members = ["."]
+members = [".", "testkit"]
+# Needs nightly and sanitizers; it carries its own copy of the lint policy,
+# which scripts/check-policy.py keeps identical.
+exclude = ["fuzz"]
 resolver = "3"
 
 [workspace.package]
@@ -13,6 +16,9 @@ edition.workspace = true
 rust-version.workspace = true
 description = "A strict Rust starter with checked operations and fast iteration builds"
 publish = false
+
+[dev-dependencies]
+testkit = { path = "testkit" }
 
 [lints]
 workspace = true

@@ -1,0 +1,15 @@
+# cargo-mutants: does each test suite notice when the code it covers changes?
+# Run `cargo mutants --in-diff <diff>` for a change, `cargo mutants` for all.
+
+# Mutants build with plain rustc, not Clippy, so only rustc lints matter.
+# dead_code = "deny" would make many mutants unbuildable ("unviable") rather
+# than caught or missed, hiding real gaps.
+cap_lints = true
+# Count tests in every workspace member, as CI does.
+test_workspace = true
+additional_cargo_args = ["--all-features", "--locked"]
+# main only forwards to run(); the test helpers are exercised by their own
+# unit tests and are not the product.
+exclude_globs = ["src/main.rs"]
+# A mutant that makes a loop endless must time out, not hang the run.
+minimum_test_timeout = 20

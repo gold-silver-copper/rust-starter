@@ -18,3 +18,29 @@
   and `cargo test --workspace --all-features --locked`. After changing policy,
   also run `python3 scripts/check-policy.py`. Use `cargo test-iter` for changes
   that need optimized execution.
+
+# Testing
+
+`docs/testing/README.md` maps problems to techniques; `testkit/` holds the
+helpers. In short:
+
+- Check with `testkit::{ensure, ensure_eq, fail}` and return `Failure`.
+- Randomized tests take a `testkit::Seed` and print `TEST_SEED=…` on failure.
+  Reproduce a reported failure with that line before changing anything.
+- Every new test must fail when its bug is put back: break the code, watch
+  the test fail, restore. For a change, `cargo mutants --in-diff` with `-j 2`.
+- Check properties or independent references. No whole-screen snapshots,
+  pixel matches or comparisons with an older build; golden files only for
+  formats that are a contract, updated with `UPDATE_GOLDEN=1` and reviewed.
+- Wait for events (`testkit::sandbox::wait_until`, fux waits), never a guessed
+  sleep. Wait for output the input cannot contain, not for typed echo.
+- Leave the machine alone: scratch under `target/` (`Scratch`), never `/tmp`,
+  the real `HOME`, shell history or real accounts. Every child process goes
+  in a `ChildGuard`; stop every server and process you start.
+- Drive terminal programs only through a private fux server
+  (`testkit::fux::Fux`), never a person's own session or panes.
+- Keep per-push tests to seconds. Larger `TEST_CASES`, fuzzing and full
+  mutation runs belong in the scheduled `deep` workflow; never start a run
+  over about ten minutes or on all cores without asking.
+- A skip must not pass silently where the tool exists (`REQUIRE_FUX=1`).
+- `fuzz/` copies the lint policy; `scripts/check-policy.py` keeps it equal.

@@ -1,5 +1,7 @@
 //! Application logic with explicit, fallible output.
 
+pub mod rle;
+
 use std::io::{self, Write};
 
 /// Write the starter's greeting.
