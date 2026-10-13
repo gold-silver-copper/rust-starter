@@ -54,7 +54,7 @@ impl Scratch {
 
 impl Drop for Scratch {
     fn drop(&mut self) {
-        if std::env::var_os("KEEP_SCRATCH").is_none_or(|value| value != "1") {
+        if !crate::env_flag("KEEP_SCRATCH") {
             // Nothing useful can be done with a failure during unwinding or drop.
             drop(fs::remove_dir_all(&self.path));
         }

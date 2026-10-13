@@ -264,7 +264,12 @@ mod tests {
             &0,
             "files in a missing corpus",
         )?;
-        std::fs::write(scratch.path().join("a"), b"fine")?;
+        let not_a_dir = scratch.path().join("a");
+        std::fs::write(&not_a_dir, b"fine")?;
+        ensure(
+            replay_dir(&not_a_dir, |_| Ok(())).is_err(),
+            "an unreadable corpus passed as empty",
+        )?;
         std::fs::write(scratch.path().join("b"), b"bad")?;
         ensure_eq(
             &replay_dir(scratch.path(), |_| Ok(()))?,

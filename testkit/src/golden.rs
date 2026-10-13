@@ -6,7 +6,7 @@
 //! change with `git diff` and commit it on its own or with its explanation.
 
 use std::path::Path;
-use std::{env, fs, io};
+use std::{fs, io};
 
 use crate::check::{Failure, line_diff};
 
@@ -19,7 +19,7 @@ use crate::check::{Failure, line_diff};
 /// A missing or different file, with a line diff and the update command, or
 /// the I/O error that stopped the comparison.
 pub fn check(dir: impl AsRef<Path>, name: &str, actual: &str) -> Result<(), Failure> {
-    let update = env::var_os("UPDATE_GOLDEN").is_some_and(|value| value == "1");
+    let update = crate::env_flag("UPDATE_GOLDEN");
     compare(&dir.as_ref().join(name), actual, update)
 }
 

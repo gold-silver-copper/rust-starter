@@ -68,10 +68,21 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
+      # Fails on missed mutants only: a mutant that hangs the tests (timeout)
+      # was noticed. fux.rs needs a current fux, which this runner lacks; run
+      # it locally with FUX_BIN and REQUIRE_FUX=1.
       - name: Mutate the lines this pull request changes
         run: |
           git diff --src-prefix=a/ --dst-prefix=b/ "origin/${GITHUB_BASE_REF}...HEAD" > changes.diff
-          cargo mutants --workspace --in-diff changes.diff -j 2 --no-shuffle
+          status=0
+          cargo mutants --workspace --in-diff changes.diff -j 2 --no-shuffle \
+            --exclude testkit/src/fux.rs || status=$?
+          case $status in 0|2|3) ;; *) exit "$status" ;; esac
+          if [ -s mutants.out/missed.txt ]; then
+            echo "::error::mutants survived; add a test or explain them (docs/testing/mutation.md)"
+            cat mutants.out/missed.txt
+            exit 1
+          fi
       - name: Keep the mutants report
         if: always()
         uses: actions/upload-artifact@v4

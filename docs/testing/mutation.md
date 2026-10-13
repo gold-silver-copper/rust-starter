@@ -37,7 +37,9 @@ cargo mutants --in-diff changes.diff -j 2
 
 The explicit prefixes matter: with `diff.mnemonicPrefix=true` in git config,
 `--in-diff` silently finds nothing to mutate. CI runs this on every pull
-request.
+request and fails only when a mutant is **missed**: a mutant that makes the
+tests hang (a timeout) was noticed. Equivalent mutants go in `exclude_re` in
+`.cargo/mutants.toml`, each with its reason.
 
 ## Reading the results
 

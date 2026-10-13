@@ -56,7 +56,7 @@ impl Fux {
             .output()
             .is_ok_and(|output| output.status.success());
         if !usable {
-            if env::var_os("REQUIRE_FUX").is_some_and(|value| value == "1") {
+            if crate::env_flag("REQUIRE_FUX") {
                 return Err(fail(format!(
                     "REQUIRE_FUX=1 but {} has no `help-agents`; install a current fux or set FUX_BIN",
                     bin.to_string_lossy()
