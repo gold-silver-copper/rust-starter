@@ -116,7 +116,10 @@ These are enforced by `cargo lint`; work with them, never around them.
 # Idioms that pass the lints
 
 Reach for these first; they are short and they compile. Every snippet here
-passes `cargo lint` as written.
+passes `cargo lint` as written. The common ones (`get(..)?`, `try_from`,
+saturating clamps and tallies, `zip(skip(1))`, slice patterns, `repeat_n`,
+`map_err`) are how fux, a ~100k-line project under the same lints, writes
+these things.
 
 **Make functions return `Option` or `Result`**, so `?` absorbs every checked
 step. Most lint friction comes from a function that returns a plain value and
@@ -126,14 +129,18 @@ has nowhere to send a failure.
 | --- | --- |
 | `v[i]` | `v.get(i)?` (or `.ok_or("why")?` in a `Result` fn) |
 | `grid[r][c]` | `grid.get(r)?.get(c)` |
-| `r - 1`, `c + 1` for neighbours | `r.checked_add_signed(dr)?` over `[(-1, 0), (1, 0), (0, -1), (0, 1)]` |
-| `count += 1` in a loop | `.filter(...).count()`; otherwise `count = count.checked_add(1)?` |
+| `r - 1`, `c + 1` for grid neighbours | `r.checked_add_signed(dr)?` over `[(-1, 0), (1, 0), (0, -1), (0, 1)]`; never saturate here, a clamped neighbour is the cell itself |
+| cursor up / down a list | `i.saturating_sub(1)`, `i.saturating_add(1).min(last)` (clamping is the meaning) |
+| `count += 1` | `.filter(...).count()`; a tally: `*n = n.saturating_add(1)` (a count cannot reach `u64::MAX`) |
+| `n += x` where `x` comes from input | `n = n.checked_add(x)?` (overflow there means bad input) |
 | a sum or product | `.try_fold(0, \|s, x\| s.checked_add(*x))` |
 | `v[i]` vs `v[i + 1]` | `v.iter().zip(v.iter().skip(1))` (`windows` is banned) |
 | `a / b` | `a.checked_div(b)?` |
 | `x as usize` | `usize::try_from(x).ok()?` / `usize::try_from(x)?` |
 | `s[1..n - 1]` | `s.get(1..n.checked_sub(1)?)?`; or work on `.chars()` / `.bytes()` |
 | `v[v.len() - 1]` | `v.last()?`; `match v { [.., a, b] => …, _ => … }` |
+| `let a = p[0]; let b = p[1];` | `let [a, b] = parts.as_slice() else { return Err(...) };` |
+| `&line[1..]` meaning "the rest, maybe empty" | `line.get(1..).unwrap_or_default()` |
 | `v.swap(i, j)` | `let [a, b] = v.get_disjoint_mut([i, j]).ok()?; std::mem::swap(a, b);` |
 | `v.chunks(n)`, `"ab".repeat(n)` | `v.as_chunks::<N>()`, `std::iter::repeat_n("ab", n).collect::<String>()` |
 | `x % 2 == 0` | `x.is_multiple_of(2)` |
@@ -144,9 +151,14 @@ has nowhere to send a failure.
 
 Traps:
 
-- `checked_add(1).unwrap_or(MAX)` is rejected (`manual_saturating_arithmetic`):
-  either propagate with `?` or write `saturating_add` when saturation is the
-  real meaning. Never pick a default just to silence a lint.
+- Saturating or checked is a decision about meaning, not about the lint:
+  saturate counters and sizes that cannot realistically overflow, and
+  positions that clamp at an edge; use `checked_*` and `?` where overflow or
+  underflow means the input was wrong. `checked_add(1).unwrap_or(MAX)` is
+  rejected (`manual_saturating_arithmetic`); write `saturating_add`.
+- `unwrap_or(0)` / `unwrap_or_default()` only when the default is the real
+  answer ("no rest" is the empty string). On a failed parse or conversion it
+  hides the error: propagate it.
 - `wrapping_*` is for algorithms that wrap by definition (hashes, RNGs).
 - `ensure(cond, format!(...))` formats even when it passes; in hot loops use
   `if !cond { return Err(fail(format!(...))); }`.
