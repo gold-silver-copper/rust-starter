@@ -19,6 +19,9 @@ the starter itself.
 
 - Keep the unsafe and panic-prevention lints at `forbid`, including tests.
   No test-only relaxations, `cfg_attr(not(test), ...)`, or blanket exemptions.
+- Short idioms that pass these lints (indexing, arithmetic, casts, slicing)
+  are in `template/AGENTS.md` under "Idioms that pass the lints"; use them
+  here too.
 - Tests return `Result`; propagate setup failures with `?` and return `Err`
   on a mismatch. Assertion macros are forbidden too.
 - Prefer checked access, fallible conversions and arithmetic with explicit

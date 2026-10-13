@@ -113,6 +113,61 @@ These are enforced by `cargo lint`; work with them, never around them.
   the build. `insta` and `proptest!` are banned because they panic.
 - New workspace members need `[lints] workspace = true`.
 
+# Idioms that pass the lints
+
+Reach for these first; they are short and they compile. Every snippet here
+passes `cargo lint` as written.
+
+**Make functions return `Option` or `Result`**, so `?` absorbs every checked
+step. Most lint friction comes from a function that returns a plain value and
+has nowhere to send a failure.
+
+| Instead of | Write |
+| --- | --- |
+| `v[i]` | `v.get(i)?` (or `.ok_or("why")?` in a `Result` fn) |
+| `grid[r][c]` | `grid.get(r)?.get(c)` |
+| `r - 1`, `c + 1` for neighbours | `r.checked_add_signed(dr)?` over `[(-1, 0), (1, 0), (0, -1), (0, 1)]` |
+| `count += 1` in a loop | `.filter(...).count()`; otherwise `count = count.checked_add(1)?` |
+| a sum or product | `.try_fold(0, \|s, x\| s.checked_add(*x))` |
+| `v[i]` vs `v[i + 1]` | `v.iter().zip(v.iter().skip(1))` (`windows` is banned) |
+| `a / b` | `a.checked_div(b)?` |
+| `x as usize` | `usize::try_from(x).ok()?` / `usize::try_from(x)?` |
+| `s[1..n - 1]` | `s.get(1..n.checked_sub(1)?)?`; or work on `.chars()` / `.bytes()` |
+| `v[v.len() - 1]` | `v.last()?`; `match v { [.., a, b] => …, _ => … }` |
+| `v.swap(i, j)` | `let [a, b] = v.get_disjoint_mut([i, j]).ok()?; std::mem::swap(a, b);` |
+| `v.chunks(n)`, `"ab".repeat(n)` | `v.as_chunks::<N>()`, `std::iter::repeat_n("ab", n).collect::<String>()` |
+| `x % 2 == 0` | `x.is_multiple_of(2)` |
+| `v.iter().max().unwrap()` | `v.iter().max()?` |
+| `.unwrap()` on a parse | `.parse().map_err(\|e\| format!("{text:?}: {e}"))?` |
+| `println!(...)` | `writeln!(out, ...)?` with `out: &mut impl Write` |
+| `assert_eq!(a, b)` in a test | `ensure_eq(&a, &b, "what")?` |
+
+Traps:
+
+- `checked_add(1).unwrap_or(MAX)` is rejected (`manual_saturating_arithmetic`):
+  either propagate with `?` or write `saturating_add` when saturation is the
+  real meaning. Never pick a default just to silence a lint.
+- `wrapping_*` is for algorithms that wrap by definition (hashes, RNGs).
+- `ensure(cond, format!(...))` formats even when it passes; in hot loops use
+  `if !cond { return Err(fail(format!(...))); }`.
+- Iterators avoid most arithmetic and indexing entirely, and read better.
+
+# Working live with people
+
+When people are pairing or watching in real time (a pairing session, an
+interview, several people steering one agent), keep the loop short and
+visible:
+
+- Skip the written spec unless asked; state the plan in two or three lines in
+  the conversation instead.
+- After each change run `cargo test -q` (seconds); run `cargo lint` when a
+  function is finished. Leave mutation testing for the end, if there is time.
+- Show the property or example you are about to test before writing the code,
+  so the people can correct the direction early.
+- Prefer the idioms above over clever code; it has to be read aloud.
+- The lint rules do not relax under time pressure. If one blocks a natural
+  solution, use the idiom table and say why in one sentence.
+
 # Testing rules
 
 The playbook, with the reasoning and worked examples, lives upstream:
